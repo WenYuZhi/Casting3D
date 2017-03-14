@@ -1,0 +1,306 @@
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+cudaError_t addWithCuda(float *T_Init, float dx, float dy, float tao, int nx, int ny, float tnpts, float pho, float Ce, float lamd, int num_blocks, int num_threadsx, int num_threadsy);
+
+__global__ void addKernel(float *T_New, float *T_Last, float dx, float dy, float pho, float Ce, float lamd, float tao, int nx, int ny, bool disout)
+{
+	int j = blockIdx.x * blockDim.x + threadIdx.x;
+	int i = threadIdx.y;
+	int idx = i * blockDim.x*gridDim.x + j;
+	int D = blockDim.x*gridDim.x;
+	float a = (lamd) / (pho*Ce), T_Up, T_Down, T_Right, T_Left, h = 200.0, Tw = 30.0, Vcast = -0.02, T_Cast = 1558.0;
+
+	if (disout) {
+		if (i == 0 && j != 0 && j != ny - 1) //1
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_Last[idx + D];
+			T_Down = T_Last[idx + D] - 2 * dx*h*(T_Last[idx] - Tw) / lamd;
+			T_Right = T_Last[idx + 1];
+			T_Left = T_Last[idx - 1];
+			T_New[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_Last[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (i == nx - 1 && j != 0 && j != ny - 1)  //2
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_Last[idx + D];
+			T_Down = T_Last[idx + D];
+			T_Right = T_Last[idx + 1];
+			T_Left = T_Last[idx - 1];
+			T_New[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_Last[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (j == 0 && i != 0 && i != nx - 1)  //3
+		{
+			T_New[idx] = T_Cast;
+		}
+		else if (j == ny - 1 && i != 0 && i != nx - 1)  //4
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_Last[idx + D];
+			T_Down = T_Last[idx - D];
+			T_Right = T_Last[idx - 1];
+			T_Left = T_Last[idx - 1];
+			T_New[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_Last[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (i == 0 && j == 0)  //5
+		{
+			T_New[idx] = T_Cast;
+		}
+		else if (i == 0 && j == ny - 1)  //6
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_Last[idx + D];
+			T_Down = T_Last[idx + D] - 2 * dx*h*(T_Last[idx] - Tw) / lamd;
+			T_Right = T_Last[idx - 1];
+			T_Left = T_Last[idx - 1];
+			T_New[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_Last[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (i == nx - 1 && j == 0)   //7
+		{
+			T_New[idx] = T_Cast;
+		}
+		else if (i == nx - 1 && j == ny - 1) //8
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_Last[idx - D];
+			T_Down = T_Last[idx - D];
+			T_Right = T_Last[idx - 1];
+			T_Left = T_Last[idx - 1];
+			T_New[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_Last[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_Last[idx + D];
+			T_Down = T_Last[idx - D];
+			T_Right = T_Last[idx + 1];
+			T_Left = T_Last[idx - 1];
+			T_New[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_Last[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+	}
+
+	else
+	{
+		if (i == 0 && j != 0 && j != ny - 1) //1
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_New[idx + D];
+			T_Down = T_New[idx + D] - 2 * dx*h*(T_New[idx] - Tw) / lamd;
+			T_Right = T_New[idx + 1];
+			T_Left = T_New[idx - 1];
+			T_Last[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_New[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (i == nx - 1 && j != 0 && j != ny - 1)  //2
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_New[idx + D];
+			T_Down = T_New[idx + D];
+			T_Right = T_New[idx + 1];
+			T_Left = T_New[idx - 1];
+			T_Last[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_New[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (j == 0 && i != 0 && i != nx - 1)  //3
+		{
+			T_Last[idx] = T_Cast;
+		}
+		else if (j == ny - 1 && i != 0 && i != nx - 1)  //4
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_New[idx + D];
+			T_Down = T_New[idx - D];
+			T_Right = T_New[idx - 1];
+			T_Left = T_New[idx - 1];
+			T_Last[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_New[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (i == 0 && j == 0)  //5
+		{
+			T_Last[idx] = T_Cast;
+		}
+		else if (i == 0 && j == ny - 1)  //6
+		{
+			//T_Last[idx] = T_Cast;
+			T_Up = T_New[idx + D];
+			T_Down = T_New[idx + D] - 2 * dx*h*(T_New[idx] - Tw) / lamd;
+			T_Right = T_New[idx - 1];
+			T_Left = T_New[idx - 1];
+			T_Last[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_New[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else if (i == nx - 1 && j == 0)   //7
+		{
+			T_Last[idx] = T_Cast;
+		}
+		else if (i == nx - 1 && j == ny - 1) //8
+		{
+			//T_Last[idx] = T_Cast;
+			T_Up = T_New[idx - D];
+			T_Down = T_New[idx - D];
+			T_Right = T_New[idx - 1];
+			T_Left = T_New[idx - 1];
+			T_Last[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_New[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+		else
+		{
+			//T_New[idx] = T_Cast;
+			T_Up = T_New[idx + D];
+			T_Down = T_New[idx - D];
+			T_Right = T_New[idx + 1];
+			T_Left = T_New[idx - 1];
+			T_Last[idx] = a*(tao / (dx*dx))*T_Up + a*(tao / (dx*dx))*T_Down + (1 - 2 * a*(tao / (dx*dx)) - 2 * a*(tao / (dy*dy)) + tao*Vcast / dy)*T_New[idx] +
+				a*(tao / (dy*dy))*T_Right + (a*(tao / (dy*dy)) - tao*Vcast / dy)*T_Left;
+		}
+	}
+}
+
+int main()
+{
+	const int nx = 21, ny = 3000, nz = 1;
+	int num_blocks = 1, num_threadsx = 1, num_threadsy = 1, k = 0 ;
+	float T_Cast = 1558.0, Lx = 0.25, Ly = 30.0, dy, dx, t_final=1500.0, tnpts=4000.0, tao, pho=7000.0, Ce=540.0, lamd=30.0;
+	float *T_Init;
+	T_Init = (float *)calloc(nx * ny, sizeof(float));
+	//T_New = (float *)calloc(nx, sizeof(float));
+	//T_Last = (float *)calloc(nx, sizeof(float));
+	num_threadsx = nx;
+	num_threadsy = 30;
+	num_blocks = ny/num_threadsy;
+
+	for (int i = 0; i < nx; i++)
+		for (int j = 0; j < ny; j++)
+		{
+			T_Init[i * ny + j] = T_Cast;
+			k++;
+		}
+			
+	//printf("%d,\n ", k);
+	dx = Lx / (nx - 1);
+	dy = Ly / (ny - 1);
+	tao = t_final / (tnpts - 1);
+
+	int timestart = clock();
+    // Add vectors in parallel.
+    cudaError_t cudaStatus = addWithCuda(T_Init, dx, dy, tao, nx, ny, tnpts, pho, Ce, lamd, num_blocks, num_threadsx, num_threadsy);
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "addWithCuda failed!");
+        return 1;
+    }
+	int timeend = clock();
+
+	printf("running time = %d", timeend-timestart);
+
+    // cudaDeviceReset must be called before exiting in order for profiling and
+    // tracing tools such as Nsight and Visual Profiler to show complete traces.
+    cudaStatus = cudaDeviceReset();
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "cudaDeviceReset failed!");
+        return 1;
+    }
+
+    return 0;
+}
+
+cudaError_t addWithCuda(float *T_Init, float dx, float dy, float tao, int nx, int ny, float tnpts, float pho, float Ce, float lamd, int num_blocks, int num_threadsx, int num_threadsy)
+{
+	float *dev_T_New, *dev_T_Last, *T_Result;
+	const int Num_Iter = 50;
+	volatile bool dstOut = true;
+	dim3 blocks(ny), threads(nx);
+
+	T_Result = (float *)calloc(nx * ny, sizeof(float));
+
+	cudaError_t cudaStatus;
+
+	// Choose which GPU to run on, change this on a multi-GPU system.
+	cudaStatus = cudaSetDevice(0);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
+		goto Error;
+	}
+
+	cudaStatus = cudaMalloc((void**)&dev_T_New, nx * ny * sizeof(float));
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc failed!");
+		goto Error;
+	}
+
+	cudaStatus = cudaMalloc((void**)&dev_T_Last, nx * ny * sizeof(float));
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc failed!");
+		goto Error;
+	}
+
+	cudaStatus = cudaMemcpy(dev_T_Last, T_Init, nx * ny * sizeof(float), cudaMemcpyHostToDevice);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy failed!");
+		goto Error;
+	}
+
+	// Copy input vectors from host memory to GPU buffers.
+
+	dim3 threadsPerBlock(num_threadsx, num_threadsy);
+	dim3 numBlocks(num_blocks);
+	// Launch a kernel on the GPU with one thread for each element.
+	for (int i = 0; i < tnpts; i++)
+	{
+		addKernel << <numBlocks, threadsPerBlock >> >(dev_T_New, dev_T_Last, dx, dy, pho, Ce, lamd, tao, nx, ny, dstOut);
+		dstOut = !dstOut;
+
+		if (i % Num_Iter == 0) {
+			cudaStatus = cudaMemcpy(T_Result, dev_T_Last, nx * ny * sizeof(int), cudaMemcpyDeviceToHost);
+			if (cudaStatus != cudaSuccess) {
+				fprintf(stderr, "cudaMemcpy failed!");
+				goto Error;
+			}
+
+			printf("time_step = %d \n", i);
+				//for (int j = 0; j < ny; j++)
+				//{
+					printf("%f, %f, %f, %f", T_Result[2001], T_Result[2000], T_Result[201], T_Result[5555]);
+				//}	    
+			printf("\n");
+				//printf("%d, ", i);
+			}
+	}
+	
+
+	// Check for any errors launching the kernel
+	cudaStatus = cudaGetLastError();
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+		goto Error;
+	}
+
+	// cudaDeviceSynchronize waits for the kernel to finish, and returns
+	// any errors encountered during the launch.
+	cudaStatus = cudaDeviceSynchronize();
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
+		goto Error;
+	}
+
+	// Copy output vector from GPU buffer to host memory.
+
+
+Error:
+	cudaFree(dev_T_New);
+	cudaFree(dev_T_Last);
+
+	return cudaStatus;
+}
+// Helper function for using CUDA to add vectors in parallel.
