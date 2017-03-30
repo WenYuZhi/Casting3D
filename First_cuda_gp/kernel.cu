@@ -27,7 +27,7 @@ __global__ void addKernel(float *T_New, float *T_Last, float *ccml, float *H_Ini
 	float a, T_Up, T_Down, T_Right, T_Left, T_Forw, T_Back, h = 100.0, Tw = 30.0, Vcast = -0.02, T_Cast = 1558.0;
 
 	if (disout) {
-		Physicial_Parameters(T_New[idx], &pho, &Ce, &lamd);
+		Physicial_Parameters(T_Last[idx], &pho, &Ce, &lamd);
 		a = (lamd) / (pho*Ce);
 		h = Boundary_Condition(j, dy, ccml, H_Init);
 		if (j == 0) //1
